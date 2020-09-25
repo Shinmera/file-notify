@@ -7,5 +7,8 @@
 (defpackage #:org.shirakumo.file-notify
   (:use #:cl)
   (:shadow #:byte)
+  (:local-nicknames
+   #+windows
+   (#:com #:org.shirakumo.com-on))
   ;; protocol.lisp
   (:export))

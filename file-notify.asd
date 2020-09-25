@@ -22,4 +22,5 @@
                (:file "fsevent" :if-feature :darwin)
                (:file "documentation"))
   :depends-on (:documentation-utils
-               :cffi))
+               :cffi
+               (:feature :windows :com-on)))
