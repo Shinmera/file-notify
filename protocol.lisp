@@ -9,13 +9,18 @@
 (defmacro define-implementable (name args)
   `(setf (fdefinition ',name)
          (lambda ,args
-           (declare (ignore ,@args))
+           (declare (ignore ,@(loop for arg in args
+                                    unless (find arg lambda-list-keywords)
+                                    collect arg)))
            (error "Not implemented"))))
 
 (defmacro define-implementation (name args &body body)
   `(progn
      (fmakunbound ',name)
      (defun ,name ,args ,@body)))
+
+(define-condition failure (error)
+  ())
 
 (define-implementable init (&key))
 
@@ -27,7 +32,7 @@
 
 (define-implementable unwatch (file/s))
 
-(define-implementable poll (function &key timeout))
+(define-implementable process-events (function &key timeout))
 
 (defmacro with-events ((file change-type &rest args) &body body)
-  `(poll (lambda (,file ,change-type) ,@body) ,@args))
+  `(process-events (lambda (,file ,change-type) ,@body) ,@args))
