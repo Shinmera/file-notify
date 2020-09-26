@@ -11,4 +11,12 @@
    #+windows
    (#:com #:org.shirakumo.com-on))
   ;; protocol.lisp
-  (:export))
+  (:export
+   #:failure
+   #:init
+   #:shutdown
+   #:watch
+   #:list-watched
+   #:unwatch
+   #:process-events
+   #:with-events))

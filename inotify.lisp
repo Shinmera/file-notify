@@ -118,9 +118,12 @@
 (define-implementation shutdown ()
   (when *fd*
     (close *fd*)
-    (setf *fd* NIL)))
+    (setf *fd* NIL)
+    (clrhash *path->watch*)
+    (clrhash *watch->path*)))
 
 (define-implementation watch (file/s &key (events T))
+  (init)
   (let ((events (case events
                   ((T) :all)
                   ((NIL) ())
@@ -154,9 +157,15 @@
 
 (defun handle-event (path watch event)
   (case event
-    (:delete-self
+    ((:ignored :delete-self :unmount)
      (remhash path *path->watch*)
      (remhash watch *watch->path*))))
+
+(defun map-type (type)
+  (case type
+    (:delete-self :delete)
+    (:move-self :move)
+    (T type)))
 
 (defun process (function)
   (cffi:with-foreign-object (event '(:struct event))
@@ -177,11 +186,12 @@
                      (T
                       (dolist (type types)
                         (handle-event path (event-watch event) type)
-                        (funcall function path type))))
+                        (funcall function path (map-type type)))))
                (cffi:incf-pointer event size)
                (decf read size)))))
 
 (define-implementation process-events (function &key timeout)
+  (init)
   (let* ((tsec (etypecase timeout
                  ((eql T) 0.5)
                  ((eql NIL) 0)

@@ -10,11 +10,14 @@
   ())
 
 (cffi:defbitfield (filter :uint32)
-  (:rename           #x00000001)
+  (:rename-file      #x00000001)
   (:rename-directory #x00000002)
+  (:move             #x00000003)
+  (:create           #x00000003)
+  (:delete           #x00000003)
   (:attribute        #x00000004)
   (:size             #x00000008)
-  (:write            #x00000010)
+  (:modify           #x00000010)
   (:security         #x00000100)
   (:all              #x0000011F))
 
@@ -74,7 +77,11 @@
 (defvar *watches* (make-hash-table :test 'equal))
 
 (define-implementation init ())
-(define-implementation shutdown ())
+
+(define-implementation shutdown ()
+  (loop for v being the hash-values of *watches*
+        do (close-change (car v)))
+  (clrhash *watches*))
 
 (define-implementation watch (file/s &key (events T))
   (let ((filter (case events
