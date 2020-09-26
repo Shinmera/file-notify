@@ -152,10 +152,10 @@
         (mapc #'del file/s)
         (del file/s))))
 
-(defun handle-event (file watch event)
+(defun handle-event (path watch event)
   (case event
     (:delete-self
-     (remhash file *path->watch*)
+     (remhash path *path->watch*)
      (remhash watch *watch->path*))))
 
 (defun process (function)
@@ -164,17 +164,18 @@
           (event event))
       (check-errno (< 0 read))
       (loop for path = (gethash (event-watch event) *watch->path*)
-            for type = (event-mask event)
+            for types = (event-mask event)
             for size = (- (cffi:foreign-type-size '(:struct event)) 256)
             while (<= size read)
-            do (when path
-                 (cond ((and (null (pathname-name path))
-                              (null (pathname-type path))
-                              (< 0 (event-length event)))
-                        (let ((file (cffi:mem-ref (cffi:foreign-slot-pointer event '(:struct event) 'name) :string)))
-                          (incf size (event-length event))
-                          (funcall function (merge-pathnames file path) type)))
-                       (T
+            do (cond ((null path)
+                      (print (event-watch event)))
+                     ((< 0 (event-length event))
+                      (let ((file (cffi:mem-ref (cffi:foreign-slot-pointer event '(:struct event) 'name) :string)))
+                        (incf size (event-length event))
+                        (dolist (type types)
+                          (funcall function (merge-pathnames file path) type))))
+                     (T
+                      (dolist (type types)
                         (handle-event path (event-watch event) type)
                         (funcall function path type))))
                (cffi:incf-pointer event size)
