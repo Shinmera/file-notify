@@ -2,4 +2,29 @@
 This is a small OS portability library to get notifications for file access and changes.
 
 ## How To
-AAAAAAAAAAAAAAAAAAAAAAAAAAA
+For the purpose of this tutorial we will assume ``org.shirakumo.file-notify`` has the nickname ``notify``.
+
+Before we can even begin, we need to add a file that we want to watch.
+
+:: common lisp
+(notify:watch "~/quicklisp/")
+::
+
+Watching a directory will report all the events happening within. We can listen for them like this:
+
+:: common lisp
+(notify:with-events (file change :timeout T)
+  (print (list file change)))
+::
+
+Adding, removing, or changing a file within ``~/quicklisp/`` should now show a corresponding event at the REPL.
+
+If we no longer care about a file, it can also be ``unwatch``ed again.
+
+For more detailed information on the behaviour and capabilities, please refer to the individual functions.
+
+## Supported Platforms
+The following platforms are supported:
+
+- Linux (inotify)
+- Windows
