@@ -28,3 +28,4 @@ The following platforms are supported:
 
 - Linux (inotify)
 - Windows
+- macOS (fsevent)
