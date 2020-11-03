@@ -157,20 +157,21 @@
          (dirs (make-array count)))
     (when (<= #x80 count)
       (error "FIXME: Too many watches. Don't know how to deal with this."))
-    (cffi:with-foreign-objects ((handles :pointer count))
-      (loop for i from 0
-            for directory being the hash-keys of *watches*
-            for watch being the hash-values of *watches*
-            do (setf (cffi:mem-aref handles :pointer i) (watch-handle watch))
-               (setf (aref dirs i) directory))
-      (loop for ev = (wait-for-multiple-objects count handles NIL msec)
-            do (case ev
-                 ((:abandoned :io-completion))
-                 (:timeout
-                  (unless (eql T timeout)
-                    (return)))
-                 (:failed
-                  (check-last-error NIL))
-                 (T
-                  (when (< ev #x80)
-                    (process (cffi:mem-aref handles :pointer ev) (aref dirs ev) function))))))))
+    (when (< 0 count)
+      (cffi:with-foreign-objects ((handles :pointer count))
+        (loop for i from 0
+              for directory being the hash-keys of *watches*
+              for watch being the hash-values of *watches*
+              do (setf (cffi:mem-aref handles :pointer i) (watch-handle watch))
+                 (setf (aref dirs i) directory))
+        (loop for ev = (wait-for-multiple-objects count handles NIL msec)
+              do (case ev
+                   ((:abandoned :io-completion))
+                   (:timeout
+                    (unless (eql T timeout)
+                      (return)))
+                   (:failed
+                    (check-last-error NIL))
+                   (T
+                    (when (< ev #x80)
+                      (process (cffi:mem-aref handles :pointer ev) (aref dirs ev) function)))))))))
