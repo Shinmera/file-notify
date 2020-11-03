@@ -203,7 +203,11 @@
       (setf (pollfd-revents pollfd) 0)
       (loop for poll = (poll pollfd 1 msec)
             do (unless (check-errno (<= 0 poll)
-                         (4 T))
+                         (4
+                          ;; Syscall was interrupted.
+                          ;; Wait for a bit then try again.
+                          (sleep 0.01)
+                          T))
                  (when (< 0 poll)
                    (process function))
                  (unless (eql T timeout)
