@@ -103,11 +103,12 @@
   (error 'inotify-failure :code code :function-name function-name
                           :message (or message (error-message code))))
 
-(defmacro check-errno (predicate &body cleanup)
+(defmacro check-errno (predicate &body errno-cases)
   `(unless ,predicate
-     ,@cleanup
      (let ((code errno))
-       (inotify-failure code))))
+       (case code
+         ,@errno-cases
+         (T (inotify-failure code))))))
 
 (define-implementation init (&key flags)
   (unless *fd*
@@ -201,9 +202,10 @@
       (setf (pollfd-events pollfd) :in)
       (setf (pollfd-revents pollfd) 0)
       (loop for poll = (poll pollfd 1 msec)
-            do (check-errno (<= 0 poll))
-               (when (< 0 poll)
-                 (process function))
-               (unless (eql T timeout)
-                 (return))
-               (finish-output)))))
+            do (unless (check-errno (<= 0 poll)
+                         (4 T))
+                 (when (< 0 poll)
+                   (process function))
+                 (unless (eql T timeout)
+                   (return))
+                 (finish-output))))))
