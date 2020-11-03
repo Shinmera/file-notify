@@ -21,15 +21,19 @@
   (:security         #x00000100)
   (:all              #x0000011F))
 
-(cffi:defcenum (action :uint32)
-  :create
+(cffi:defcenum (action :uint32 :allow-undeclared-values T)
+  (:create 1)
   :delete
   :modify
   :moved-from
-  :moved-to)
+  :moved-to
+  :stream-create
+  :stream-delete
+  :stream-modify
+  :id-not-tunnelled
+  :tunnelled-id-collision)
 
 (cffi:defcenum (wait-result :uint32 :allow-undeclared-values T)
-  (:ok #x00)
   (:abandoned #x80)
   (:io-completion #xC0)
   (:timeout #x102)
@@ -71,16 +75,19 @@
 (defmacro check-last-error (predicate &body cleanup)
   `(unless ,predicate
      ,@cleanup
-     (let ((errno (com:get-last-error)))
-       (win32-error errno :type 'windows-failure))))
+     (let ((errno (org.shirakumo.com-on.cffi:get-last-error)))
+       (com:win32-error errno :type 'windows-failure))))
 
 (defvar *watches* (make-hash-table :test 'equal))
 
 (define-implementation init ())
 
+(defstruct (watch (:constructor make-watch (handle table)))
+  handle table)
+
 (define-implementation shutdown ()
   (loop for v being the hash-values of *watches*
-        do (close-change (car v)))
+        do (close-change (watch-handle v)))
   (clrhash *watches*))
 
 (define-implementation watch (file/s &key (events T))
@@ -97,10 +104,9 @@
                    (let ((handle (first-change path NIL filter)))
                      (check-last-error (/= #+64-bit #xFFFFFFFFFFFFFFFF #-64-bit #xFFFFFFFF
                                            (cffi:pointer-address handle)))
-                     (shiftf existing
-                             (gethash dir *watches*)
-                             (cons handle (make-hash-table :test 'equal))))))
-               (setf (gethash path (cdr existing)) T))))
+                     (setf existing (make-watch handle (make-hash-table :test 'equal)))
+                     (setf (gethash dir *watches*) existing))))
+               (setf (gethash path (watch-table existing)) T))))
       (if (listp file/s)
           (mapc #'add file/s)
           (add file/s)))))
@@ -108,7 +114,7 @@
 (define-implementation list-watched ()
   (let ((watched ()))
     (loop for v being the hash-values of *watches*
-          do (loop for k being the hash-keys of (cdr v)
+          do (loop for k being the hash-keys of (watch-table v)
                    do (push k watched)))
     watched))
 
@@ -118,22 +124,25 @@
                   (dir (make-pathname :name NIL :type NIL :defaults path))
                   (existing (gethash dir *watches*)))
              (when existing
-               (remhash path (cdr existing))
-               (when (= 0 (hash-table-count (cdr existing)))
-                 (check-last-error (close-change (car existing)))
+               (remhash path (watch-table existing))
+               (when (= 0 (hash-table-count (watch-table existing)))
+                 (check-last-error (close-change (watch-handle existing)))
                  (remhash dir *watches*))))))
     (if (listp file/s)
         (mapc #'del file/s)
         (del file/s))))
 
-(defun process (handle function)
+(defun process (handle directory function)
   (cffi:with-foreign-objects ((event '(:struct event))
                               (written :uint32))
     (check-last-error (read-changes handle event (cffi:foreign-type-size '(:struct event)) NIL :all
                                     written (cffi:null-pointer) (cffi:null-pointer)))
-    (let ((path (com:wstring->string (cffi:foreign-slot-pointer '(:struct event) 'name)
-                                     (event-length event))))
-      (funcall function path (event-action event)))
+    (let ((path (merge-pathnames (com:wstring->string (cffi:foreign-slot-pointer event '(:struct event) 'name)
+                                                      (event-length event))
+                                 directory))
+          (action (event-action event)))
+      (when (keywordp action)
+        (funcall function path action)))
     (check-last-error (next-change handle))))
 
 (define-implementation process-events (function &key timeout)
@@ -146,15 +155,15 @@
          (dirs (make-array count)))
     (when (<= #x80 count)
       (error "FIXME: Too many watches. Don't know how to deal with this."))
-    (cffi:with-foreign-object ((handles :pointer count))
+    (cffi:with-foreign-objects ((handles :pointer count))
       (loop for i from 0
             for directory being the hash-keys of *watches*
-            for handle being the hash-values of *watches*
-            do (setf (cffi:mem-aref handles :pointer i) (car handle))
+            for watch being the hash-values of *watches*
+            do (setf (cffi:mem-aref handles :pointer i) (watch-handle watch))
                (setf (aref dirs i) directory))
       (loop for ev = (wait-for-multiple-objects count handles NIL msec)
             do (case ev
-                 (:io-completion)
+                 ((:abandoned :io-completion))
                  (:timeout
                   (unless (eql T timeout)
                     (return)))
@@ -162,4 +171,4 @@
                   (check-last-error NIL))
                  (T
                   (when (< ev #x80)
-                    (process (aref dirs ev) function))))))))
+                    (process (cffi:mem-aref handles :pointer ev) (aref dirs ev) function))))))))
