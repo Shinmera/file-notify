@@ -80,6 +80,9 @@
   (bytes :pointer)
   (wait :bool))
 
+(cffi:defcfun (cancel-io "CancelIo") :bool
+  (handle :pointer))
+
 (cffi:defcfun (first-change "FindFirstChangeNotificationW") :pointer
   (path :pointer)
   (watch-subtree :bool)
@@ -138,11 +141,16 @@
 (defstruct (watch (:constructor make-watch (directory handle event buffer overlapped table)))
   directory handle event buffer overlapped table)
 
+(defun close-watch (watch)
+  (cancel-io (watch-handle watch))
+  (close-handle (watch-handle watch))
+  (close-handle (watch-event watch))
+  (cffi:foreign-free (watch-buffer watch))
+  (cffi:foreign-free (watch-overlapped watch)))
+
 (define-implementation shutdown ()
   (loop for v being the hash-values of *watches*
-        do (close-handle (watch-handle v))
-           (cffi:foreign-free (watch-event v))
-           (cffi:foreign-free (watch-overlapped v)))
+        do (close-watch v))
   (clrhash *watches*))
 
 (define-implementation watch (file/s &key (events T))
@@ -197,10 +205,7 @@
              (when existing
                (remhash path (watch-table existing))
                (when (= 0 (hash-table-count (watch-table existing)))
-                 (close-handle (watch-handle existing))
-                 (close-handle (watch-event existing))
-                 (cffi:foreign-free (watch-buffer existing))
-                 (cffi:foreign-free (watch-overlapped existing))
+                 (close-watch existing)
                  (remhash dir *watches*))))))
     (if (listp file/s)
         (mapc #'del file/s)
