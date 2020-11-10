@@ -68,8 +68,8 @@
   (name :uint16 :count 259))
 
 (cffi:defcstruct (overlapped :conc-name overlapped-)
-  (internal :size)
-  (internal-high :size)
+  (internal #+64-bit :uint64 #-64-bit :uint32)
+  (internal-high #+64-bit :uint64 #-64-bit :uint32)
   (offset :uint32)
   (offset-high :uint32)
   (handle :pointer))
