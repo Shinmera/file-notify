@@ -218,13 +218,14 @@
     (setf (overlapped-offset overlapped) 0)
     (setf (overlapped-offset-high overlapped) 0)
     (setf (overlapped-handle overlapped) event)
+    (cffi:foreign-funcall "memset" :pointer buffer :int 0 #+64-bit :uint64 #-64-bit :uint32
+                                                          (cffi:foreign-type-size '(:struct event)) :pointer)
     (check-last-error (read-changes handle buffer (cffi:foreign-type-size '(:struct event)) NIL :all
                                     (cffi:null-pointer) overlapped (cffi:null-pointer)))))
 
 (defun process-change (watch function)
   (let* ((buffer (watch-buffer watch))
-         (path (merge-pathnames (com:wstring->string (cffi:foreign-slot-pointer buffer '(:struct event) 'name)
-                                                     (event-length buffer))
+         (path (merge-pathnames (com:wstring->string (cffi:foreign-slot-pointer buffer '(:struct event) 'name))
                                 (watch-directory watch)))
          (action (event-action buffer)))
     (when (keywordp action)
