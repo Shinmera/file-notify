@@ -127,6 +127,8 @@ The TYPE passed to the function may be one of the following:
   :MOVED-TO      --- A file was moved and this is the new name.
   :OPEN          --- The file was opened.
 
+Note: on MacOS the timeout parameter is almost guaranteed to be useless.
+
 See WATCH
 See UNWATCH
 See WITH-EVENTS

@@ -250,10 +250,12 @@
 (cffi:defcallback fsevent :void ((stream :pointer) (data :pointer) (event-count size) (paths :pointer) (flags :pointer) (ids :pointer))
   (loop for i from 0 below event-count
         for path = (cffi:mem-aref paths :string i)
-        for event = (cffi:mem-aref flags 'event-flag i)
+        for events = (cffi:mem-aref flags 'event-flag i)
         for id = (cffi:mem-aref ids :uint64 i)
-        do (dolist (type event)
-             (let ((event (flag->event type)))
-               (when event
-                 (funcall *callback* path event))))
-           (setf *last-id* id)))
+        do (when (< *last-id* id)
+             (dolist (type events)
+               (let ((event (flag->event type)))
+                 (when event
+                   (funcall *callback* path event)))))
+           (unless (find :history-done events)
+             (setf *last-id* (print id)))))
