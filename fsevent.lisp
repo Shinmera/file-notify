@@ -15,6 +15,9 @@
 (cffi:define-foreign-library corefoundation
   (T (:framework "CoreFoundation")))
 
+(cffi:define-foreign-library coreservices
+  (T (:framework "CoreServices")))
+
 (cffi:defctype size #+64-bit :uint64 #-64-bit :uint32)
 
 (cffi:defcenum (run-loop-result :int32)
@@ -122,7 +125,10 @@
 (cffi:defcfun (release-event-stream "FSEventStreamRelease") :void
   (stream :pointer))
 
-(cffi:defcvar (now-id "kFSEventStreamEventIdSinceNow") :uint64)
+(cffi:defcfun (flush-event-stream "FSEventStreamFlushAsync") :uint64
+  (stream :pointer))
+
+(defconstant now-id #xFFFFFFFFFFFFFFFF)
 
 (defun release (&rest objects)
   (dolist (object objects)
@@ -158,10 +164,11 @@
        (release ,@(nreverse (mapcar #'first bindings))))))
 
 (defmacro define-lazy-constant (name init)
-  `(let (value)
-     (defun ,name ()
-       (or value (setf value ,init)))
-     (define-symbol-macro ,name (,name))))
+  `(eval-when (:compile-toplevel :load-toplevel :execute)
+     (let (value)
+       (defun ,name ()
+         (or value (setf value ,init)))
+       (define-symbol-macro ,name (,name)))))
 
 (defvar *watches* (make-hash-table :test 'equal))
 (defvar *last-id*)
@@ -172,6 +179,7 @@
 (define-implementation init (&key)
   (unless (boundp '*last-id*)
     (cffi:use-foreign-library corefoundation)
+    (cffi:use-foreign-library coreservices)
     (setf *last-id* now-id)))
 
 (define-implementation shutdown ()
@@ -186,7 +194,7 @@
         (add file/s))))
 
 (define-implementation list-watched ()
-  (loop for k being the hash-keys *watches*
+  (loop for k being the hash-keys of *watches*
         collect k))
 
 (define-implementation unwatch (file/s)
@@ -200,10 +208,11 @@
   (init)
   (let* ((*callback* function)
          (entries (mapcar #'create-string (list-watched)))
-         (tsec (ecase timeout
-                 ((T) 0.5)
-                 ((NIL) 0.0)
-                 (T timeout))))
+         (tsec (float (case timeout
+                        ((T) 0.5)
+                        ((NIL) 0.0)
+                        (T timeout))
+                      0d0)))
     (unwind-protect
          (with-cf-objects ((array (create-array entries)))
            (let ((stream (create-event-stream (cffi:null-pointer)
@@ -211,35 +220,40 @@
                                               (cffi:null-pointer)
                                               array
                                               *last-id*
-                                              1.0d0
+                                              0.01d0
                                               '(:watch-root :file-events))))
              (unwind-protect
                   (progn
                     (schedule-with-run-loop stream (current-run-loop) default-run-loop-mode)
                     (start-event-stream stream)
-                    (loop (run-loop default-run-loop-mode tsec T)
-                          (unless (eql T timeout)
-                            (return))))
+                    (loop
+                       (flush-event-stream stream)
+                       (run-loop default-run-loop-mode tsec T)
+                       (unless (eql T timeout)
+                         (return))))
                (stop-event-stream stream)
                (invalidate-event-stream stream)
                (release-event-stream stream))))
       (mapc #'release entries))))
 
-(defun flag->event (flags)
-  (loop for flag in flags
-        do (case flag
-             (:item-created (return :create))
-             (:item-removed (return :delete))
-             (:item-inode-meta-mod (return :attribute))
-             (:item-renamed (return :move))
-             (:item-modified (return :modify))
-             (:item-finder-info-mod (return :attribute))
-             (:item-change-owner (return :attribute))
-             (:item-xattr-mod (return :attribute)))))
+(defun flag->event (flag)
+  (case flag
+    (:item-created :create)
+    (:item-removed :delete)
+    (:item-inode-meta-mod :attribute)
+    (:item-renamed :move)
+    (:item-modified :modify)
+    (:item-finder-info-mod :attribute)
+    (:item-change-owner :attribute)
+    (:item-xattr-mod :attribute)))
 
-(cffi:defcallback fsevent ((stream :pointer) (data :pointer) (event-count size) (paths :pointer) (flags :pointer) (ids :pointer)) :void
+(cffi:defcallback fsevent :void ((stream :pointer) (data :pointer) (event-count size) (paths :pointer) (flags :pointer) (ids :pointer))
   (loop for i from 0 below event-count
-        for path = (cffi:mem-aref paths :pointer i)
-        for event = (flag->event (cffi:mem-aref flags event-flag i))
+        for path = (cffi:mem-aref paths :string i)
+        for event = (cffi:mem-aref flags 'event-flag i)
         for id = (cffi:mem-aref ids :uint64 i)
-        do (when event (funcall *callback* path event))))
+        do (dolist (type event)
+             (let ((event (flag->event type)))
+               (when event
+                 (funcall *callback* path event))))
+           (setf *last-id* id)))
