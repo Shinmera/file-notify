@@ -258,4 +258,4 @@
                  (when event
                    (funcall *callback* path event)))))
            (unless (find :history-done events)
-             (setf *last-id* (print id)))))
+             (setf *last-id* id))))
