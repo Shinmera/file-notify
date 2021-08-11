@@ -12,11 +12,8 @@
   (:report (lambda (c s) (format s "The call ~@[to~%  ~a~%~]failed.~@[~%  ~a~]"
                                  (function-name c) (message c)))))
 
-(cffi:define-foreign-library corefoundation
-  (T (:framework "CoreFoundation")))
-
-(cffi:define-foreign-library coreservices
-  (T (:framework "CoreServices")))
+(cffi:load-foreign-library "/System/Library/Frameworks/CoreFoundation.framework/Versions/Current/CoreFoundation")
+(cffi:load-foreign-library "/System/Library/Frameworks/CoreServices.framework/Versions/Current/CoreServices")
 
 (cffi:defctype size #+64-bit :uint64 #-64-bit :uint32)
 
@@ -178,8 +175,6 @@
 
 (define-implementation init (&key)
   (unless (boundp '*last-id*)
-    (cffi:use-foreign-library corefoundation)
-    (cffi:use-foreign-library coreservices)
     (setf *last-id* now-id)))
 
 (define-implementation shutdown ()
