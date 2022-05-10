@@ -118,7 +118,7 @@
 
 (define-implementation shutdown ()
   (when *fd*
-    (close *fd*)
+    (inotify-close *fd*)
     (setf *fd* NIL)
     (clrhash *path->watch*)
     (clrhash *watch->path*)))
