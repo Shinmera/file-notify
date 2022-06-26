@@ -179,7 +179,11 @@
             while (<= size read)
             do (cond ((null path))
                      ((< 0 (event-length event))
-                      (let ((file (cffi:mem-ref (cffi:foreign-slot-pointer event '(:struct event) 'name) :string)))
+                      (let ((file (string-right-trim
+                                   '(#\Null)
+                                   (cffi:foreign-string-to-lisp
+                                    (cffi:foreign-slot-pointer event '(:struct event) 'name)
+                                    :count (event-length event)))))
                         (incf size (event-length event))
                         (dolist (type types)
                           (funcall function (merge-pathnames file path) type))))
