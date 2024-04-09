@@ -158,7 +158,7 @@
 
 (defun map-type (type)
   (case type
-    (:delete-self :delete)
+    ((:delete-self :ignored :unmount) :delete)
     (:move-self :move)
     (T type)))
 
