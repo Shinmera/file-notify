@@ -204,6 +204,7 @@
       (setf (pollfd-events pollfd) :in)
       (setf (pollfd-revents pollfd) 0)
       (loop for poll = (poll pollfd 1 msec)
+            while *fd*
             do (unless (check-errno (<= 0 poll)
                          (4
                           ;; Syscall was interrupted.
