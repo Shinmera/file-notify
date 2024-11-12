@@ -120,7 +120,7 @@
 (define-implementation watch (file/s &key (events T))
   (init)
   (let ((events (case events
-                  ((T) :all)
+                  ((T) '(:all))
                   ((NIL) ())
                   (T events))))
     (when (member :move events)
