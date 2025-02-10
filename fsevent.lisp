@@ -12,6 +12,11 @@
 (cffi:define-foreign-library coreservices
   (T (:framework "CoreServices")))
 
+(set 'cl-user::*foreign-system-libraries*
+     (union (when (boundp 'cl-user::*foreign-system-libraries*)
+              (symbol-value 'cl-user::*foreign-system-libraries*))
+            '(corefoundation coreservices)))
+
 (cffi:defctype size #+64-bit :uint64 #-64-bit :uint32)
 
 (cffi:defcenum (run-loop-result :int32)
