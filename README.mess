@@ -29,3 +29,4 @@ The following platforms are supported:
 - Linux (inotify)
 - Windows
 - macOS (fsevent)
+- FreeBSD (via libinotify package or devel/libinotify port)

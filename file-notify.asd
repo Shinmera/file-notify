@@ -11,7 +11,7 @@
   :defsystem-depends-on (:trivial-features)
   :components ((:file "package")
                (:file "protocol")
-               (:file "inotify" :if-feature :linux)
+               (:file "inotify" :if-feature (:or :linux :freebsd))
                (:file "windows" :if-feature :windows)
                (:file "fsevent" :if-feature :darwin)
                (:file "documentation"))

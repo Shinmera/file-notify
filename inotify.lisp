@@ -1,5 +1,10 @@
 (in-package #:org.shirakumo.file-notify)
 
+;; FreeBSD has Linux compatibility layer in libinotify.so available via ports.
+#+freebsd
+(cffi:define-foreign-library libinotify
+  (:freebsd (:or "libinotify.so")))
+
 (define-condition inotify-failure (failure)
   ((function-name :initarg :function-name :initform NIL :reader function-name)
    (code :initarg :code :reader code)
@@ -105,6 +110,9 @@
          (T (inotify-failure code))))))
 
 (define-implementation init (&key flags)
+  #+freebsd
+  (unless (cffi:foreign-library-loaded-p 'libinotify)
+    (cffi:load-foreign-library 'libinotify))
   (unless *fd*
     (let ((fd (inotify-init flags)))
       (check-errno (<= 0 fd))
@@ -115,7 +123,10 @@
     (inotify-close *fd*)
     (setf *fd* NIL)
     (clrhash *path->watch*)
-    (clrhash *watch->path*)))
+    (clrhash *watch->path*))
+  #+freebsd
+  (when (cffi:foreign-library-loaded-p 'libinotify)
+    (cffi:close-foreign-library 'libinotify)))
 
 (define-implementation watch (file/s &key (events T))
   (init)
