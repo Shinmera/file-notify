@@ -4,9 +4,9 @@
   :author "Yukari Hafner <shinmera@tymoon.eu>"
   :maintainer "Yukari Hafner <shinmera@tymoon.eu>"
   :description "Access to file change and access notification."
-  :homepage "https://shinmera.github.io/file-notify"
-  :bug-tracker "https://github.com/Shinmera/file-notify/issues"
-  :source-control (:git "https://github.com/Shinmera/file-notify.git")
+  :homepage "https://shinmera.com/docs/file-notify"
+  :bug-tracker "https://shinmera.com/project/file-notify/issues"
+  :source-control (:git "https://shinmera.com/project/file-notify.git")
   :serial T
   :defsystem-depends-on (:trivial-features)
   :components ((:file "package")
